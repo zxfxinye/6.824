@@ -51,7 +51,10 @@ func Worker(mapf func(string, string) []KeyValue,
 	for {
 		task := CallTask()
 		//fmt.Printf("reply %v\n", task)
-		if task == nil || task.Completeflag == 1 {
+		if task == nil {
+			return
+		}
+		if task.Completeflag == 1 {
 			//fmt.Printf("mapreduce task is completed\n")
 			return
 		}
