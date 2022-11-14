@@ -108,7 +108,6 @@ func Worker(mapf func(string, string) []KeyValue,
 
 			sort.Sort(ByKey(intermediate))
 			oname := "mr-out-" + strconv.Itoa(n)
-			//fmt.Println(oname)
 			tmpfile, _ := ioutil.TempFile(os.TempDir(), oname)
 			//
 			// call Reduce on each distinct key in intermediate[],
@@ -131,13 +130,10 @@ func Worker(mapf func(string, string) []KeyValue,
 
 				i = j
 			}
-			//fmt.Println(os.TempDir()+oname," ", oname)
-			//newpath, _ := filepath.Abs(oname)
 			err := os.Rename(tmpfile.Name(), oname)
 			if err != nil {
 				log.Fatalf("rename failed...%v\n", err)
 			}
-
 		}
 		CallFinish(task)
 	}
@@ -186,7 +182,7 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 		return true
 	}
 
-	fmt.Println(err)
+	fmt.Println("call failed: ", err)
 	return false
 }
 

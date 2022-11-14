@@ -52,17 +52,13 @@ func (c *Coordinator) FinishTask(args *TaskArgs, reply *TaskReply) error {
 	c.mu.Lock()
 	c.fcount++
 	if task.Tasktype == 0 && c.fcount == len(c.tasklist) { //map任务全部完成后清空tasklist 一次性添加n个reduce任务
-		//fmt.Println("map task finished")
+		c.cond.Broadcast() //完成所有的maptask时唤醒wait的所有worker进程准备reduce
 		c.tasklist = c.tasklist[:0]
 		for i := 0; i < 10; i++ {
 			reduceTask := Task{TaskId: i, Tasktype: 1, Mapcount: c.mapcount}
 			c.tasklist = append(c.tasklist, &reduceTask)
 		}
-		//for _,t := range c.tasklist {
-		//	fmt.Println("reduce task -- ", *t)
-		//}
 	}
-	//fmt.Println("fcount = ", c.fcount)
 	if c.fcount == c.mapcount+10 { //完成所有任务
 		fmt.Println("jobs completed")
 		c.completeflag = 1
@@ -71,10 +67,9 @@ func (c *Coordinator) FinishTask(args *TaskArgs, reply *TaskReply) error {
 }
 
 func (c *Coordinator) AssignTask(args *TaskArgs, reply *TaskReply) error {
+	c.mu.Lock()
 	defer c.mu.Unlock()
 	for {
-		//fmt.Println("a request")
-		c.mu.Lock()
 		if c.completeflag == 1 { //通知worker任务以及结束
 			reply.Task = &Task{Completeflag: 1}
 			break
@@ -90,10 +85,7 @@ func (c *Coordinator) AssignTask(args *TaskArgs, reply *TaskReply) error {
 			go c.checkTaskStatus(reply.Task)
 			break
 		}
-		//fmt.Printf("begin to unlock\n")
-		c.mu.Unlock()
 		c.cond.Wait()
-		//time.Sleep(1 * time.Second)
 	}
 	return nil
 }
@@ -102,9 +94,8 @@ func (c *Coordinator) checkTaskStatus(task *Task) {
 	time.Sleep(10 * time.Second)
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.fcount < c.mapcount && task.Status != 2 {
+	if task.Status != 2 {
 		c.cond.Broadcast()
-		//fmt.Println("re-assign task")
 		task.Status = 0
 	}
 }
@@ -136,7 +127,6 @@ func (c *Coordinator) Done() bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.completeflag == 1 {
-		time.Sleep(10 * time.Second)
 		ret = true
 	}
 	return ret
@@ -151,15 +141,11 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 	var i int
 	for _, file := range files {
-		//fmt.Println(file)
 		mtask := &Task{Filename: file, TaskId: i, Tasktype: 0}
 		i++
 		c.tasklist = append(c.tasklist, mtask)
 	}
 	c.cond = sync.NewCond(&c.mu)
-	//for _,v := range c.tasklist {
-	//	fmt.Printf("%v\n", v)
-	//}
 	c.mapcount = len(files)
 	// Your code here.
 
