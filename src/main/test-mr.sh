@@ -63,6 +63,7 @@ then
 else
   echo '---' wc output is not the same as mr-correct-wc.txt
   echo '---' wc test: FAIL
+  exit 1
   failed_any=1
 fi
 
@@ -94,6 +95,7 @@ then
 else
   echo '---' indexer output is not the same as mr-correct-indexer.txt
   echo '---' indexer test: FAIL
+  exit 1
   failed_any=1
 fi
 
@@ -125,6 +127,7 @@ else
   echo '---' map workers did not run in parallel
   echo '---' map parallelism test: FAIL
   failed_any=1
+  exit 1
 fi
 
 wait
@@ -146,6 +149,7 @@ if [ "$NT" -lt "2" ]
 then
   echo '---' too few parallel reduces.
   echo '---' reduce parallelism test: FAIL
+  exit 1
   failed_any=1
 else
   echo '---' reduce parallelism test: PASS
@@ -171,6 +175,7 @@ if [ "$NT" -ne "8" ]
 then
   echo '---' map jobs ran incorrect number of times "($NT != 8)"
   echo '---' job count test: FAIL
+  exit 1
   failed_any=1
 else
   echo '---' job count test: PASS
@@ -216,6 +221,7 @@ then
 else
   echo '---' output changed after first worker exited
   echo '---' early exit test: FAIL
+  exit 1
   failed_any=1
 fi
 rm -f mr-*
@@ -266,6 +272,7 @@ then
 else
   echo '---' crash output is not the same as mr-correct-crash.txt
   echo '---' crash test: FAIL
+  exit 1
   failed_any=1
 fi
 
