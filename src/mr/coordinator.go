@@ -19,6 +19,7 @@ type Coordinator struct {
 	mapcount     int
 	mu           sync.Mutex
 	completeflag int
+	cond         *sync.Cond
 }
 type Task struct {
 	Filename     string
@@ -91,7 +92,8 @@ func (c *Coordinator) AssignTask(args *TaskArgs, reply *TaskReply) error {
 		}
 		//fmt.Printf("begin to unlock\n")
 		c.mu.Unlock()
-		time.Sleep(1 * time.Second)
+		c.cond.Wait()
+		//time.Sleep(1 * time.Second)
 	}
 	return nil
 }
@@ -101,6 +103,7 @@ func (c *Coordinator) checkTaskStatus(task *Task) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.fcount < c.mapcount && task.Status != 2 {
+		c.cond.Broadcast()
 		//fmt.Println("re-assign task")
 		task.Status = 0
 	}
@@ -153,6 +156,7 @@ func MakeCoordinator(files []string, nReduce int) *Coordinator {
 		i++
 		c.tasklist = append(c.tasklist, mtask)
 	}
+	c.cond = sync.NewCond(&c.mu)
 	//for _,v := range c.tasklist {
 	//	fmt.Printf("%v\n", v)
 	//}
