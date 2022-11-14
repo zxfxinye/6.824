@@ -26,6 +26,7 @@ type KeyValue struct {
 	Key   string
 	Value string
 }
+
 //
 // use ihash(key) % NReduce to choose the reduce
 // task number for each KeyValue emitted by Map.
@@ -35,7 +36,6 @@ func ihash(key string) int {
 	h.Write([]byte(key))
 	return int(h.Sum32() & 0x7fffffff)
 }
-
 
 //
 // main/mrworker.go calls this function.
@@ -50,9 +50,9 @@ func Worker(mapf func(string, string) []KeyValue,
 	//CallTask() 可能是map 也可能是reduce, maptask有剩余时分配maptask, maptask全部执行完毕分配reduce task
 	for {
 		task := CallTask()
-		fmt.Printf("reply %v\n", task)
-		if task.Completeflag == 1 {
-			fmt.Printf("mapreduce task is completed\n")
+		//fmt.Printf("reply %v\n", task)
+		if task == nil || task.Completeflag == 1 {
+			//fmt.Printf("mapreduce task is completed\n")
 			return
 		}
 		//fmt.Println(task)
@@ -69,17 +69,17 @@ func Worker(mapf func(string, string) []KeyValue,
 			intermediate := [10][]KeyValue{}
 			kva := mapf(task.Filename, string(content))
 			X := task.TaskId
-			for _,kv := range kva {
+			for _, kv := range kva {
 				Y := ihash(kv.Key) % 10
 				intermediate[Y] = append(intermediate[Y], kv)
 			}
-			for k,v := range intermediate {
-				f,err := os.Create("mr-"+strconv.Itoa(X) + "-"+strconv.Itoa(k))
+			for k, v := range intermediate {
+				f, err := os.Create("mr-" + strconv.Itoa(X) + "-" + strconv.Itoa(k))
 				if err != nil {
 					log.Fatal("create intermediate file failed: ", err)
 				}
 				enc := json.NewEncoder(f)
-				for _,kv := range v {
+				for _, kv := range v {
 					enc.Encode(&kv)
 				}
 			}
@@ -89,7 +89,7 @@ func Worker(mapf func(string, string) []KeyValue,
 			n := task.TaskId
 			var intermediate []KeyValue
 			for i := 0; i < task.Mapcount; i++ {
-				file, err := os.Open("mr-"+strconv.Itoa(i)+"-"+strconv.Itoa(n))
+				file, err := os.Open("mr-" + strconv.Itoa(i) + "-" + strconv.Itoa(n))
 				if err != nil {
 					log.Fatalf("open file failed %v\n", err)
 				}
@@ -104,9 +104,9 @@ func Worker(mapf func(string, string) []KeyValue,
 			}
 
 			sort.Sort(ByKey(intermediate))
-			oname := "mr-out-"+strconv.Itoa(n)
-			fmt.Println(oname)
-			tmpfile,_ := ioutil.TempFile(os.TempDir(), oname)
+			oname := "mr-out-" + strconv.Itoa(n)
+			//fmt.Println(oname)
+			tmpfile, _ := ioutil.TempFile(os.TempDir(), oname)
 			//
 			// call Reduce on each distinct key in intermediate[],
 			// and print the result to mr-out-0.
@@ -132,15 +132,14 @@ func Worker(mapf func(string, string) []KeyValue,
 			//newpath, _ := filepath.Abs(oname)
 			err := os.Rename(tmpfile.Name(), oname)
 			if err != nil {
-				log.Fatalf("rename failed...%v\n",err)
+				log.Fatalf("rename failed...%v\n", err)
 			}
 
 		}
 		CallFinish(task)
 	}
-	
-}
 
+}
 
 //
 // example function to show how to make an RPC call to the coordinator.
@@ -188,7 +187,7 @@ func call(rpcname string, args interface{}, reply interface{}) bool {
 	return false
 }
 
-func CallTask()  *Task{
+func CallTask() *Task {
 	args := TaskArgs{}
 	reply := TaskReply{}
 	call("Coordinator.AssignTask", &args, &reply)
@@ -198,5 +197,5 @@ func CallTask()  *Task{
 func CallFinish(task *Task) {
 	args := TaskArgs{}
 	args.Task = task
-	call("Coordinator.FinishTask", &args,nil)
+	call("Coordinator.FinishTask", &args, nil)
 }

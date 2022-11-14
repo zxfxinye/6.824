@@ -15,20 +15,19 @@ type Coordinator struct {
 	// Your definitions here.
 	tasklist []*Task //task list
 	//rlist []*Task //reducetask list
-	fcount int // 已完成的task数
-	mapcount int
-	mu sync.Mutex
+	fcount       int // 已完成的task数
+	mapcount     int
+	mu           sync.Mutex
 	completeflag int
 }
 type Task struct {
-	Filename string
-	TaskId int
-	Status int8
-	Tasktype int8 //0-maptask; 1-reducetask
-	Mapcount int
+	Filename     string
+	TaskId       int
+	Status       int8
+	Tasktype     int8 //0-maptask; 1-reducetask
+	Mapcount     int
 	Completeflag int
 }
-
 
 // Your code here -- RPC handlers for the worker to call.
 
@@ -48,20 +47,21 @@ func (c *Coordinator) FinishTask(args *TaskArgs, reply *TaskReply) error {
 	defer c.mu.Unlock()
 	c.tasklist[task.TaskId].Status = 2
 	c.mu.Unlock()
-	
+
 	c.mu.Lock()
 	c.fcount++
 	if task.Tasktype == 0 && c.fcount == len(c.tasklist) { //map任务全部完成后清空tasklist 一次性添加n个reduce任务
-		fmt.Println("map task finished")
+		//fmt.Println("map task finished")
 		c.tasklist = c.tasklist[:0]
 		for i := 0; i < 10; i++ {
-			reduceTask := Task{TaskId: i, Tasktype: 1,Mapcount: c.mapcount}
+			reduceTask := Task{TaskId: i, Tasktype: 1, Mapcount: c.mapcount}
 			c.tasklist = append(c.tasklist, &reduceTask)
 		}
-		for _,t := range c.tasklist {
-			fmt.Println("reduce task -- ", *t)
-		}
+		//for _,t := range c.tasklist {
+		//	fmt.Println("reduce task -- ", *t)
+		//}
 	}
+	//fmt.Println("fcount = ", c.fcount)
 	if c.fcount == c.mapcount+10 { //完成所有任务
 		fmt.Println("jobs completed")
 		c.completeflag = 1
@@ -69,32 +69,30 @@ func (c *Coordinator) FinishTask(args *TaskArgs, reply *TaskReply) error {
 	return nil
 }
 
-func (c *Coordinator) AssignTask(args *TaskArgs, reply *TaskReply) error{
+func (c *Coordinator) AssignTask(args *TaskArgs, reply *TaskReply) error {
 	defer c.mu.Unlock()
-		for {
-			fmt.Println("a request")
-			c.mu.Lock()
-			if c.completeflag == 1 { //通知worker任务以及结束
-				reply.Task = &Task{Completeflag: 1}
-				break
-			}
-			for _,mt := range c.tasklist {
-				if mt.Status == 0 {
-					fmt.Println("assign -- ", *mt)
-					reply.Task = mt
-					break
-				}
-			}
-			fmt.Printf("unlocked, %v\n", reply.Task)
-			if reply.Task != nil {
-				reply.Task.Status = 1
-				go c.checkTaskStatus(reply.Task)
-				break
-			}
-			fmt.Printf("begin to unlock\n")
-			c.mu.Unlock()
-			time.Sleep(1*time.Second)
+	for {
+		//fmt.Println("a request")
+		c.mu.Lock()
+		if c.completeflag == 1 { //通知worker任务以及结束
+			reply.Task = &Task{Completeflag: 1}
+			break
 		}
+		for _, mt := range c.tasklist {
+			if mt.Status == 0 {
+				reply.Task = mt
+				break
+			}
+		}
+		if reply.Task != nil {
+			reply.Task.Status = 1
+			go c.checkTaskStatus(reply.Task)
+			break
+		}
+		//fmt.Printf("begin to unlock\n")
+		c.mu.Unlock()
+		time.Sleep(1 * time.Second)
+	}
 	return nil
 }
 
@@ -103,7 +101,7 @@ func (c *Coordinator) checkTaskStatus(task *Task) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.fcount < c.mapcount && task.Status != 2 {
-		fmt.Println("re-assign task")
+		//fmt.Println("re-assign task")
 		task.Status = 0
 	}
 }
@@ -124,8 +122,6 @@ func (c *Coordinator) server() {
 	go http.Serve(l, nil)
 }
 
-
-
 //
 // main/mrcoordinator.go calls Done() periodically to find out
 // if the entire job has finished.
@@ -134,8 +130,10 @@ func (c *Coordinator) Done() bool {
 	ret := false
 
 	// Your code here.
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.completeflag == 1 {
-		time.Sleep(10*time.Second)
+		time.Sleep(10 * time.Second)
 		ret = true
 	}
 	return ret
@@ -149,18 +147,17 @@ func (c *Coordinator) Done() bool {
 func MakeCoordinator(files []string, nReduce int) *Coordinator {
 	c := Coordinator{}
 	var i int
-	for _,file := range files {
-		fmt.Println(file)
+	for _, file := range files {
+		//fmt.Println(file)
 		mtask := &Task{Filename: file, TaskId: i, Tasktype: 0}
 		i++
 		c.tasklist = append(c.tasklist, mtask)
 	}
-	for _,v := range c.tasklist {
-		fmt.Printf("%v\n", v)
-	}
+	//for _,v := range c.tasklist {
+	//	fmt.Printf("%v\n", v)
+	//}
 	c.mapcount = len(files)
 	// Your code here.
-
 
 	c.server()
 	return &c
